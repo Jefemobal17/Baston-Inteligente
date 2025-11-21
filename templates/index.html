@@ -4,26 +4,94 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Bastón Inteligente</title>
+
 <style>
-/* (usa el CSS que ya tenías; aquí lo acorto para brevedad) */
-body{font-family:Arial,Helvetica,sans-serif;background:#0f172a;color:#fff;padding:20px}
-.container{max-width:1100px;margin:0 auto}
-.card{background:rgba(255,255,255,0.06);padding:20px;border-radius:12px;margin-bottom:16px}
-.distancia-valor{font-size:56px;text-align:center}
-.historico{max-height:300px;overflow:auto}
-img.ultima{max-width:100%;border-radius:8px}
+/* ----------- ESTILO PASTEL PARA NIÑAS ----------- */
+body{
+  font-family:'Poppins', sans-serif;
+  background:#fce7f3; /* Rosa pastel */
+  color:#4a4a4a;
+  margin:0;
+  padding:20px;
+}
+
+.container{
+  max-width:1100px;
+  margin:0 auto;
+}
+
+.card{
+  background:#ffffff;
+  padding:20px;
+  border-radius:20px;
+  margin-bottom:22px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+  border:3px solid #f9c6e4;
+}
+
+h1{
+  font-weight:600;
+  text-align:center;
+  color:#d946ef;
+}
+
+h2{
+  color:#c026d3;
+}
+
+button{
+  margin-top:10px;
+  background:#f472b6;
+  border:none;
+  padding:10px 18px;
+  color:white;
+  font-size:15px;
+  border-radius:10px;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+button:hover{
+  background:#ec4899;
+}
+
+.distancia-valor{
+  font-size:55px;
+  text-align:center;
+  font-weight:600;
+  color:#db2777;
+}
+
+.historico{
+  max-height:300px;
+  overflow:auto;
+}
+
+.historico div{
+  border-bottom:1px solid #f9d8eb;
+  padding:4px 0;
+}
+
+img.ultima{
+  max-width:100%;
+  border-radius:12px;
+  border:3px solid #f9c6e4;
+}
 </style>
 </head>
+
 <body>
 <div class="container">
   <h1>🦯 Bastón Inteligente - Monitor</h1>
 
+  <!-- TARJETA DE DISTANCIA -->
   <div class="card">
     <h2>Distancia actual</h2>
     <div class="distancia-valor" id="distancia">-- cm</div>
     <div id="estado">Esperando...</div>
   </div>
 
+  <!-- TARJETA DE IMAGEN -->
   <div class="card">
     <h2>Última imagen (ESP32-CAM)</h2>
     <div id="imagenCont">
@@ -31,6 +99,7 @@ img.ultima{max-width:100%;border-radius:8px}
     </div>
   </div>
 
+  <!-- HISTÓRICO -->
   <div class="card">
     <h2>Histórico</h2>
     <div class="historico" id="historico"></div>
@@ -39,21 +108,66 @@ img.ultima{max-width:100%;border-radius:8px}
 </div>
 
 <script>
-const BASE = ""; // si lo despliegas en mismo dominio de Render, deja vacío. Sino pon 'https://mi-proyecto.onrender.com'
+// --------------------------------------
+// CONFIG (Render usa mismo dominio: BASE = "")
+// --------------------------------------
+const BASE = "";
+
+// --------------------------------------
+// NOTIFICACIONES
+// --------------------------------------
+if (Notification.permission !== "granted") {
+    Notification.requestPermission();
+}
+
+function enviarNotificacion(mensaje) {
+    if (Notification.permission === "granted") {
+        new Notification("🚨 Bastón Inteligente", {
+            body: mensaje,
+            icon: "https://cdn-icons-png.flaticon.com/128/3917/3917215.png"
+        });
+    }
+}
+
+// Evita repetir notificaciones
+let alertaPrev = false;
+
+// --------------------------------------
+// OBTENER DATOS DEL SERVIDOR
+// --------------------------------------
 async function obtener() {
   try {
     const r = await fetch(BASE + '/api/datos');
     if (!r.ok) throw new Error("no data");
     const data = await r.json();
-    document.getElementById('distancia').textContent = (data.distancia || 0).toFixed(1) + " cm";
-    if (data.alerta) document.getElementById('estado').textContent = "⚠️ ALERTA";
-    else document.getElementById('estado').textContent = "✅ Normal";
 
-    // imagen
+    // Mostrar distancia
+    document.getElementById('distancia').textContent =
+      (data.distancia || 0).toFixed(1) + " cm";
+
+    // ALERTA
+    if (data.alerta) {
+      document.getElementById('estado').textContent =
+        "⚠️ ALERTA - Objeto cercano";
+
+      if (!alertaPrev) {
+        enviarNotificacion("Alerta: Objeto muy cercano detectado.");
+        alertaPrev = true;
+      }
+
+    } else {
+      document.getElementById('estado').textContent = "✅ Normal";
+      alertaPrev = false;
+    }
+
+    // Imagen de ESP32-CAM
     const imgRes = await fetch(BASE + '/api/last_image');
+
     if (imgRes.status === 200) {
       const info = await imgRes.json();
-      document.getElementById('imagenCont').innerHTML = `<img class="ultima" src="${BASE}/uploads/${info.filename}" alt="Última imagen"> <div>Subido: ${new Date(info.timestamp).toLocaleString()}</div>`;
+      document.getElementById('imagenCont').innerHTML =
+      `<img class="ultima" src="${BASE}/uploads/${info.filename}" alt="Imagen">
+       <div>Subido: ${new Date(info.timestamp).toLocaleString()}</div>`;
     }
 
   } catch (e) {
@@ -61,24 +175,45 @@ async function obtener() {
   }
 }
 
+// --------------------------------------
+// HISTÓRICO
+// --------------------------------------
 async function cargarHistorico() {
   try {
     const r = await fetch(BASE + '/api/historico');
     const hist = await r.json();
-    const div = document.getElementById('historico');
-    div.innerHTML = hist.map(h => `<div>${new Date(h.tiempo).toLocaleString()} — ${h.distancia} cm ${h.alerta? '⚠️' : ''}</div>`).join('');
-  } catch(e){ console.log(e) }
+
+    document.getElementById('historico').innerHTML =
+      hist.map(h =>
+        `<div>${new Date(h.tiempo).toLocaleString()} — ${h.distancia} cm ${
+           h.alerta ? '⚠️' : ''
+        }</div>`
+      ).join('');
+
+  } catch(e){ console.log(e); }
 }
 
+// --------------------------------------
+// LIMPIAR HISTÓRICO
+// --------------------------------------
 async function limpiarHistorico() {
-  if (!confirm("Limpiar histórico?")) return;
-  await fetch(BASE + '/api/limpiar', {method:'POST', headers: {'X-API-Key': 'baston123'}});
+  if (!confirm("¿Limpiar histórico completo?")) return;
+
+  await fetch(BASE + '/api/limpiar', {
+    method:'POST',
+    headers: { 'X-API-Key': 'baston123' }
+  });
+
   document.getElementById('historico').innerHTML = '';
   alert('Histórico limpiado');
 }
 
+// --------------------------------------
+// ACTUALIZACIÓN AUTOMÁTICA
+// --------------------------------------
 setInterval(()=>{ obtener(); cargarHistorico(); }, 2000);
 obtener(); cargarHistorico();
 </script>
+
 </body>
 </html>
