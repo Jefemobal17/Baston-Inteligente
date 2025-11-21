@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 # CONFIG
-API_KEY = "baston123"   # cambia si quieres
+API_KEY = "baston123"
 UPLOAD_FOLDER = Path("uploads")
 UPLOAD_FOLDER.mkdir(exist_ok=True)
 DB_PATH = "database.db"
@@ -18,11 +18,15 @@ CORS(app)
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    # Tabla con campos GPS agregados
     c.execute('''
         CREATE TABLE IF NOT EXISTS distancia (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             valor REAL,
             alerta INTEGER,
+            latitud REAL,
+            longitud REAL,
+            satelites INTEGER,
             timestamp TEXT
         )
     ''')
@@ -36,32 +40,62 @@ def init_db():
     conn.commit()
     conn.close()
 
-def insert_distancia(valor, alerta):
+def insert_distancia(valor, alerta, latitud=None, longitud=None, satelites=0):
     ts = datetime.utcnow().isoformat()
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('INSERT INTO distancia (valor, alerta, timestamp) VALUES (?,?,?)', (valor, int(bool(alerta)), ts))
+    c.execute('''
+        INSERT INTO distancia (valor, alerta, latitud, longitud, satelites, timestamp) 
+        VALUES (?,?,?,?,?,?)
+    ''', (valor, int(bool(alerta)), latitud, longitud, satelites, ts))
     conn.commit()
     conn.close()
 
 def get_last_distancia():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('SELECT valor, alerta, timestamp FROM distancia ORDER BY id DESC LIMIT 1')
+    c.execute('''
+        SELECT valor, alerta, latitud, longitud, satelites, timestamp 
+        FROM distancia ORDER BY id DESC LIMIT 1
+    ''')
     row = c.fetchone()
     conn.close()
     if row:
-        return {"distancia": row[0], "alerta": bool(row[1]), "ultima_actualizacion": row[2]}
+        return {
+            "distancia": row[0], 
+            "alerta": bool(row[1]), 
+            "latitud": row[2],
+            "longitud": row[3],
+            "satelites": row[4],
+            "tiempo": row[5]
+        }
     else:
-        return {"distancia": 0, "alerta": False, "ultima_actualizacion": None}
+        return {
+            "distancia": 0, 
+            "alerta": False, 
+            "latitud": None,
+            "longitud": None,
+            "satelites": 0,
+            "tiempo": None
+        }
 
 def get_historial(limit=100):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('SELECT valor, alerta, timestamp FROM distancia ORDER BY id DESC LIMIT ?', (limit,))
+    c.execute('''
+        SELECT valor, alerta, latitud, longitud, satelites, timestamp 
+        FROM distancia ORDER BY id DESC LIMIT ?
+    ''', (limit,))
     rows = c.fetchall()
     conn.close()
-    return [{"distancia": r[0], "alerta": bool(r[1]), "tiempo": r[2]} for r in rows]
+    return [{
+        "distancia": r[0], 
+        "alerta": bool(r[1]), 
+        "latitud": r[2],
+        "longitud": r[3],
+        "satelites": r[4],
+        "tiempo": r[5]
+    } for r in rows]
 
 def insert_imagen(filename):
     ts = datetime.utcnow().isoformat()
@@ -89,7 +123,7 @@ init_db()
 def index():
     return render_template("index.html")
 
-# ESP32 normal -> envía JSON con distancia
+# ESP32 -> envía JSON con distancia + GPS
 @app.route('/data', methods=['POST'])
 def recibir_datos():
     api_key = request.headers.get('X-API-Key')
@@ -99,9 +133,22 @@ def recibir_datos():
     data = request.get_json(force=True)
     distancia = float(data.get('distancia', 0))
     alerta = bool(data.get('alerta', False))
+    
+    # Nuevos campos GPS
+    latitud = data.get('latitud')
+    longitud = data.get('longitud')
+    satelites = int(data.get('satelites', 0))
+    
+    # Convertir a float si no es None
+    if latitud is not None:
+        latitud = float(latitud)
+    if longitud is not None:
+        longitud = float(longitud)
 
-    insert_distancia(distancia, alerta)
-    print(f"[{datetime.utcnow().isoformat()}] Distancia recibida: {distancia} alerta={alerta}")
+    insert_distancia(distancia, alerta, latitud, longitud, satelites)
+    
+    gps_info = f"GPS:{latitud},{longitud} ({satelites}sats)" if latitud else "GPS:No disponible"
+    print(f"[{datetime.utcnow().isoformat()}] Distancia:{distancia}cm alerta={alerta} {gps_info}")
 
     return jsonify({"status": "ok"}), 200
 
@@ -112,14 +159,12 @@ def recibir_imagen():
     if api_key != API_KEY:
         return jsonify({"error": "API Key inválida"}), 403
 
-    # Aceptamos tanto multipart/form-data (file) como raw image/jpeg
     if 'file' in request.files:
         f = request.files['file']
         filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.jpg"
         path = UPLOAD_FOLDER / filename
         f.save(path)
     else:
-        # raw body (image/jpeg)
         filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.jpg"
         path = UPLOAD_FOLDER / filename
         with open(path, "wb") as fd:
@@ -140,6 +185,38 @@ def api_datos():
 def api_historico():
     return jsonify(get_historial(limit=200))
 
+# API estadísticas
+@app.route('/api/estadisticas', methods=['GET'])
+def api_estadisticas():
+    historial = get_historial(limit=1000)
+    total_registros = len(historial)
+    total_alertas = sum(1 for h in historial if h['alerta'])
+    
+    distancias = [h['distancia'] for h in historial if h['distancia'] > 0]
+    distancia_minima = min(distancias) if distancias else None
+    distancia_maxima = max(distancias) if distancias else None
+    distancia_promedio = round(sum(distancias) / len(distancias), 1) if distancias else None
+    
+    registros_con_gps = sum(1 for h in historial if h['latitud'] is not None and h['longitud'] is not None)
+    porcentaje_gps = round((registros_con_gps / total_registros * 100), 1) if total_registros > 0 else 0
+    
+    return jsonify({
+        'totalRegistros': total_registros,
+        'totalAlertas': total_alertas,
+        'distanciaMinima': distancia_minima,
+        'distanciaMaxima': distancia_maxima,
+        'distanciaPromedio': distancia_promedio,
+        'registrosConGPS': registros_con_gps,
+        'porcentajeGPS': f"{porcentaje_gps}%"
+    })
+
+# API alertas con GPS
+@app.route('/api/alertas', methods=['GET'])
+def api_alertas():
+    historial = get_historial(limit=1000)
+    alertas = [h for h in historial if h['alerta']]
+    return jsonify(alertas)
+
 # API ultima imagen (devuelve metadata)
 @app.route('/api/last_image', methods=['GET'])
 def api_last_image():
@@ -153,7 +230,7 @@ def api_last_image():
 def uploaded_file(filename):
     return send_from_directory(str(UPLOAD_FOLDER), filename)
 
-# Limpiar historial (opcional)
+# Limpiar historial
 @app.route('/api/limpiar', methods=['POST'])
 def limpiar():
     api_key = request.headers.get('X-API-Key')
@@ -170,5 +247,18 @@ def limpiar():
         p.unlink(missing_ok=True)
     return jsonify({"status": "limpiado"}), 200
 
+# Health check
+@app.route('/health')
+def health():
+    ultimo = get_last_distancia()
+    return jsonify({
+        'status': 'ok',
+        'servidor': 'Bastón Inteligente GPS',
+        'ultimaActualizacion': ultimo.get('tiempo')
+    })
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    port = int(os.environ.get("PORT", 5000))
+    print(f"🚀 Servidor iniciado en puerto {port}")
+    print("📡 Esperando datos del ESP32...")
+    app.run(host="0.0.0.0", port=port)
