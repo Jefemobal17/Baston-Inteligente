@@ -280,6 +280,14 @@ button.secondary:hover{
 <div class="container">
   <h1>🦯 Bastón Inteligente - Monitor GPS</h1>
 
+  <!-- ALERTA DE PERMISOS -->
+  <div class="card" id="alertaPermisos" style="display:none; background:#fef3c7; border-color:#f59e0b;">
+    <h2 style="color:#92400e;">🔔 Activa las Notificaciones</h2>
+    <p style="color:#92400e;">Para recibir alertas de peligro en tiempo real, necesitas activar las notificaciones del navegador.</p>
+    <button onclick="solicitarPermisoNotificaciones()" style="background:#f59e0b;">✅ Activar Notificaciones</button>
+    <button onclick="cerrarAlertaPermisos()" class="secondary">❌ Cerrar</button>
+  </div>
+
   <!-- FILA CON DISTANCIA Y GPS -->
   <div class="grid-2">
     <!-- TARJETA DE DISTANCIA -->
@@ -374,7 +382,8 @@ button.secondary:hover{
 </audio>
 
 <script>
-const BASE = "";
+// IMPORTANTE: Cambia esta URL por la de tu servidor en Render.com
+const BASE = "https://baston-inteligente.onrender.com"; // ⚠️ CAMBIAR POR TU URL
 
 let alertaPrev = false;
 let contadorAlertas = 0;
@@ -395,18 +404,76 @@ if ('speechSynthesis' in window) {
   synth = window.speechSynthesis;
 }
 
-if (Notification.permission !== "granted") {
-  Notification.requestPermission();
+// Verificar permisos de notificaciones al cargar
+function verificarPermisosNotificaciones() {
+  if (Notification.permission === "default") {
+    document.getElementById('alertaPermisos').style.display = 'block';
+  } else if (Notification.permission === "denied") {
+    console.warn('⚠️ Las notificaciones están bloqueadas. Actívalas en la configuración del navegador.');
+  } else {
+    console.log('✅ Notificaciones activadas');
+  }
+}
+
+function solicitarPermisoNotificaciones() {
+  Notification.requestPermission().then(permission => {
+    if (permission === "granted") {
+      alert('✅ Notificaciones activadas correctamente');
+      document.getElementById('alertaPermisos').style.display = 'none';
+      // Enviar notificación de prueba
+      new Notification("🦯 Bastón Inteligente", {
+        body: "Las notificaciones están activadas. Recibirás alertas de peligro.",
+        icon: "https://cdn-icons-png.flaticon.com/128/3917/3917215.png"
+      });
+    } else {
+      alert('❌ Las notificaciones fueron bloqueadas. Actívalas manualmente en la configuración del navegador.');
+    }
+  });
+}
+
+function cerrarAlertaPermisos() {
+  document.getElementById('alertaPermisos').style.display = 'none';
 }
 
 function enviarNotificacion(mensaje, distancia) {
   if (Notification.permission === "granted") {
-    new Notification("🚨 Bastón Inteligente - ALERTA", {
-      body: `${mensaje}\nDistancia: ${distancia} cm`,
+    // Crear notificación con más información
+    let body = `${mensaje}\n📏 Distancia: ${distancia.toFixed(1)} cm`;
+    
+    // Agregar ubicación GPS si está disponible
+    if (gpsLatitud && gpsLongitud) {
+      body += `\n📍 Ubicación: ${gpsLatitud.toFixed(6)}, ${gpsLongitud.toFixed(6)}`;
+    }
+    
+    const notification = new Notification("🚨 BASTÓN INTELIGENTE - PELIGRO", {
+      body: body,
       icon: "https://cdn-icons-png.flaticon.com/128/3917/3917215.png",
+      badge: "https://cdn-icons-png.flaticon.com/128/3917/3917215.png",
       requireInteraction: true,
-      tag: 'baston-alerta'
+      tag: 'baston-alerta-' + Date.now(),
+      vibrate: [200, 100, 200], // Vibración en móviles
+      silent: false
     });
+    
+    // Cerrar automáticamente después de 10 segundos
+    setTimeout(() => notification.close(), 10000);
+    
+    // Acción al hacer click en la notificación
+    notification.onclick = function() {
+      window.focus();
+      this.close();
+      
+      // Si hay GPS, abrir en Google Maps
+      if (gpsLatitud && gpsLongitud) {
+        const confirmar = confirm('¿Quieres ver la ubicación del peligro en Google Maps?');
+        if (confirmar) {
+          window.open(`https://www.google.com/maps?q=${gpsLatitud},${gpsLongitud}`, '_blank');
+        }
+      }
+    };
+  } else if (Notification.permission === "default") {
+    console.log('⚠️ Solicitando permisos de notificación...');
+    Notification.requestPermission();
   }
 }
 
@@ -712,6 +779,9 @@ cargarHistorico();
 window.addEventListener('load', () => {
   console.log('🦯 Sistema de Bastón Inteligente con GPS inicializado');
   console.log('📡 Esperando datos del sensor y GPS...');
+  
+  // Verificar permisos de notificaciones
+  verificarPermisosNotificaciones();
 });
 </script>
 
