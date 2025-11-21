@@ -43,10 +43,12 @@ h1{
   font-weight:600;
   text-align:center;
   color:#d946ef;
+  margin-bottom:30px;
 }
 
 h2{
   color:#c026d3;
+  margin-top:0;
 }
 
 button{
@@ -112,7 +114,7 @@ button.secondary:hover{
 
 .gps-info{
   display:grid;
-  grid-template-columns:1fr 1fr;
+  grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
   gap:15px;
   margin-top:15px;
 }
@@ -161,16 +163,21 @@ button.secondary:hover{
 
 .gps-estado{
   display:inline-block;
-  padding:6px 12px;
-  border-radius:6px;
-  font-size:14px;
+  padding:8px 16px;
+  border-radius:8px;
+  font-size:15px;
   font-weight:500;
-  margin-top:10px;
+  margin-bottom:15px;
 }
 
 .gps-estado.valido{
   background:#d1fae5;
   color:#065f46;
+}
+
+.gps-estado.buscando{
+  background:#fef3c7;
+  color:#92400e;
 }
 
 .gps-estado.invalido{
@@ -186,6 +193,7 @@ button.secondary:hover{
 .historico div{
   border-bottom:1px solid #f9d8eb;
   padding:8px 4px;
+  font-size:14px;
 }
 
 .historico div.peligro{
@@ -206,17 +214,22 @@ button.secondary:hover{
   border-radius:8px;
   margin-bottom:8px;
   border-left:4px solid #ef4444;
+  font-size:14px;
 }
 
 .sonido-control{
   display:flex;
+  flex-wrap:wrap;
   align-items:center;
-  gap:10px;
+  gap:15px;
   margin-top:10px;
 }
 
 .sonido-control label{
   font-weight:500;
+  display:flex;
+  align-items:center;
+  gap:5px;
 }
 
 .stats{
@@ -244,6 +257,22 @@ button.secondary:hover{
   color:#666;
   margin-top:5px;
 }
+
+.grid-2{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));
+  gap:22px;
+  margin-bottom:22px;
+}
+
+@media (max-width: 768px){
+  .gps-info{
+    grid-template-columns:1fr;
+  }
+  .grid-2{
+    grid-template-columns:1fr;
+  }
+}
 </style>
 </head>
 
@@ -251,50 +280,49 @@ button.secondary:hover{
 <div class="container">
   <h1>🦯 Bastón Inteligente - Monitor GPS</h1>
 
-  <!-- TARJETA DE DISTANCIA -->
-  <div class="card" id="cardDistancia">
-    <h2>Distancia actual</h2>
-    <div class="distancia-valor" id="distancia">-- cm</div>
-    <div class="estado normal" id="estado">Esperando...</div>
-    
-    <div class="sonido-control">
-      <label>
-        <input type="checkbox" id="sonidoCheck" checked> Activar alerta sonora
-      </label>
-      <label>
-        <input type="checkbox" id="vozCheck" checked> Activar alerta de voz
-      </label>
+  <!-- FILA CON DISTANCIA Y GPS -->
+  <div class="grid-2">
+    <!-- TARJETA DE DISTANCIA -->
+    <div class="card" id="cardDistancia">
+      <h2>📏 Distancia actual</h2>
+      <div class="distancia-valor" id="distancia">-- cm</div>
+      <div class="estado normal" id="estado">Esperando datos...</div>
+      
+      <div class="sonido-control">
+        <label>
+          <input type="checkbox" id="sonidoCheck" checked> 🔊 Sonido
+        </label>
+        <label>
+          <input type="checkbox" id="vozCheck" checked> 🗣️ Voz
+        </label>
+      </div>
     </div>
-  </div>
 
-  <!-- TARJETA GPS -->
-  <div class="card">
-    <h2>📍 Ubicación GPS</h2>
-    <div id="gpsEstado" class="gps-estado invalido">⏳ Esperando señal GPS...</div>
-    
-    <div class="gps-info">
-      <div class="gps-dato">
-        <div class="gps-label">🌍 Latitud</div>
-        <div class="gps-valor" id="latitud">--</div>
+    <!-- TARJETA GPS -->
+    <div class="card">
+      <h2>📍 Ubicación GPS</h2>
+      <div id="gpsEstado" class="gps-estado buscando">⏳ Buscando satélites...</div>
+      
+      <div class="gps-info">
+        <div class="gps-dato">
+          <div class="gps-label">🌍 Latitud</div>
+          <div class="gps-valor" id="latitud">--</div>
+        </div>
+        <div class="gps-dato">
+          <div class="gps-label">🌍 Longitud</div>
+          <div class="gps-valor" id="longitud">--</div>
+        </div>
+        <div class="gps-dato">
+          <div class="gps-label">🛰️ Satélites</div>
+          <div class="gps-valor" id="satelites">0</div>
+        </div>
       </div>
-      <div class="gps-dato">
-        <div class="gps-label">🌍 Longitud</div>
-        <div class="gps-valor" id="longitud">--</div>
+      
+      <div class="gps-mapa">
+        <a href="#" id="verMapa" target="_blank" style="display:none;">
+          🗺️ Ver ubicación en Google Maps
+        </a>
       </div>
-      <div class="gps-dato">
-        <div class="gps-label">🛰️ Satélites</div>
-        <div class="gps-valor" id="satelites">0</div>
-      </div>
-      <div class="gps-dato">
-        <div class="gps-label">⏰ Última actualización</div>
-        <div class="gps-valor" id="ultimaActualizacion" style="font-size:16px;">--</div>
-      </div>
-    </div>
-    
-    <div class="gps-mapa">
-      <a href="#" id="verMapa" target="_blank" style="display:none;">
-        🗺️ Ver en Google Maps
-      </a>
     </div>
   </div>
 
@@ -314,24 +342,30 @@ button.secondary:hover{
         <div class="stat-numero" id="distanciaMin">--</div>
         <div class="stat-etiqueta">Distancia mínima</div>
       </div>
+      <div class="stat-box">
+        <div class="stat-numero" id="ultimaActualizacion">--</div>
+        <div class="stat-etiqueta">Última actualización</div>
+      </div>
     </div>
   </div>
 
   <!-- REGISTRO DE ALERTAS -->
   <div class="card">
-    <h2>🚨 Registro de Alertas</h2>
+    <h2>🚨 Registro de Alertas Recientes</h2>
     <div class="alertas-registro" id="alertasRegistro">
       <p style="text-align:center; color:#999;">No hay alertas registradas</p>
     </div>
-    <button onclick="limpiarAlertas()">Limpiar registro de alertas</button>
+    <button onclick="limpiarAlertas()">🗑️ Limpiar alertas</button>
   </div>
 
   <!-- HISTÓRICO -->
   <div class="card">
-    <h2>📝 Histórico completo</h2>
-    <div class="historico" id="historico"></div>
-    <button onclick="limpiarHistorico()">Limpiar histórico</button>
-    <button class="secondary" onclick="descargarHistorico()">Descargar datos</button>
+    <h2>📝 Histórico Completo</h2>
+    <div class="historico" id="historico">
+      <p style="text-align:center; color:#999; padding:20px;">Cargando datos...</p>
+    </div>
+    <button onclick="limpiarHistorico()">🗑️ Limpiar histórico</button>
+    <button class="secondary" onclick="descargarHistorico()">💾 Descargar CSV</button>
   </div>
 </div>
 
@@ -350,11 +384,12 @@ let ultimaDistanciaAlerta = null;
 let audioContext = null;
 let synth = null;
 
-// GPS
+// Variables GPS
 let gpsLatitud = null;
 let gpsLongitud = null;
 let gpsSatelites = 0;
 let gpsValido = false;
+let primeraLecturaGPS = true;
 
 if ('speechSynthesis' in window) {
   synth = window.speechSynthesis;
@@ -436,6 +471,7 @@ function registrarAlerta(distancia) {
     distancia: distancia,
     latitud: gpsLatitud,
     longitud: gpsLongitud,
+    satelites: gpsSatelites,
     id: Date.now()
   };
   
@@ -457,13 +493,16 @@ function actualizarRegistroAlertas() {
   contenedor.innerHTML = alertasHoy.map(a => {
     let ubicacion = '';
     if (a.latitud && a.longitud) {
-      ubicacion = `<br>📍 Ubicación: ${a.latitud.toFixed(6)}, ${a.longitud.toFixed(6)}`;
+      ubicacion = `<br>📍 <strong>Ubicación:</strong> ${a.latitud.toFixed(6)}, ${a.longitud.toFixed(6)}
+                   <br>🛰️ ${a.satelites || 0} satélites`;
+    } else {
+      ubicacion = '<br>📍 <em>GPS no disponible</em>';
     }
     return `
     <div class="alerta-item">
       <strong>⚠️ ALERTA</strong><br>
-      ${new Date(a.tiempo).toLocaleString()}<br>
-      Distancia: <strong>${a.distancia.toFixed(1)} cm</strong>${ubicacion}
+      🕐 ${new Date(a.tiempo).toLocaleString()}<br>
+      📏 Distancia: <strong>${a.distancia.toFixed(1)} cm</strong>${ubicacion}
     </div>
   `}).join('');
 }
@@ -487,15 +526,33 @@ function actualizarGPS(lat, lng, sats) {
   document.getElementById('latitud').textContent = lat.toFixed(6);
   document.getElementById('longitud').textContent = lng.toFixed(6);
   document.getElementById('satelites').textContent = sats;
-  document.getElementById('ultimaActualizacion').textContent = new Date().toLocaleTimeString();
   
   const estadoGPS = document.getElementById('gpsEstado');
-  estadoGPS.className = 'gps-estado valido';
-  estadoGPS.textContent = '✅ GPS Activo';
+  
+  if (sats >= 4) {
+    estadoGPS.className = 'gps-estado valido';
+    estadoGPS.textContent = '✅ GPS Activo - Señal buena';
+  } else if (sats > 0) {
+    estadoGPS.className = 'gps-estado buscando';
+    estadoGPS.textContent = '⏳ GPS Parcial - Buscando más satélites';
+  }
   
   const enlaceMapa = document.getElementById('verMapa');
   enlaceMapa.style.display = 'inline-block';
   enlaceMapa.href = `https://www.google.com/maps?q=${lat},${lng}`;
+  
+  if (primeraLecturaGPS && sats >= 4) {
+    console.log('✅ GPS conectado exitosamente');
+    primeraLecturaGPS = false;
+  }
+}
+
+function mostrarGPSInvalido() {
+  const estadoGPS = document.getElementById('gpsEstado');
+  estadoGPS.className = 'gps-estado buscando';
+  estadoGPS.textContent = '⏳ Buscando satélites GPS...';
+  
+  document.getElementById('verMapa').style.display = 'none';
 }
 
 async function obtener() {
@@ -510,12 +567,18 @@ async function obtener() {
     const cardEl = document.getElementById('cardDistancia');
 
     distanciaEl.textContent = distancia.toFixed(1) + " cm";
+    
+    // Actualizar última actualización
+    document.getElementById('ultimaActualizacion').textContent = new Date().toLocaleTimeString();
 
-    // Actualizar GPS si está disponible
-    if (data.latitud && data.longitud) {
+    // Actualizar GPS
+    if (data.latitud !== null && data.longitud !== null && data.latitud !== undefined && data.longitud !== undefined) {
       actualizarGPS(data.latitud, data.longitud, data.satelites || 0);
+    } else {
+      mostrarGPSInvalido();
     }
 
+    // Manejo de alertas
     if (data.alerta) {
       distanciaEl.classList.add('peligro');
       estadoEl.className = 'estado alerta';
@@ -542,7 +605,8 @@ async function obtener() {
     }
 
   } catch (e) {
-    console.log(e);
+    console.log('Error obteniendo datos:', e);
+    document.getElementById('estado').textContent = "⚠️ Error de conexión";
   }
 }
 
@@ -551,35 +615,46 @@ async function cargarHistorico() {
     const r = await fetch(BASE + '/api/historico');
     const hist = await r.json();
 
+    if (hist.length === 0) {
+      document.getElementById('historico').innerHTML = '<p style="text-align:center; color:#999; padding:20px;">No hay datos en el histórico</p>';
+      return;
+    }
+
     document.getElementById('historico').innerHTML =
       hist.map(h => {
         const clase = h.alerta ? ' class="peligro"' : '';
         let gpsInfo = '';
         if (h.latitud && h.longitud) {
-          gpsInfo = ` | 📍 ${h.latitud.toFixed(4)}, ${h.longitud.toFixed(4)}`;
+          gpsInfo = ` | 📍 ${h.latitud.toFixed(4)}, ${h.longitud.toFixed(4)} (${h.satelites || 0} sats)`;
         }
         return `<div${clase}>${new Date(h.tiempo).toLocaleString()} — ${h.distancia} cm ${
            h.alerta ? '⚠️ ALERTA' : '✅'
         }${gpsInfo}</div>`;
       }).join('');
 
-  } catch(e){ console.log(e); }
+  } catch(e){ 
+    console.log('Error cargando histórico:', e);
+  }
 }
 
 async function limpiarHistorico() {
-  if (!confirm("¿Limpiar histórico completo?")) return;
+  if (!confirm("¿Seguro que deseas limpiar todo el histórico?")) return;
 
-  await fetch(BASE + '/api/limpiar', {
-    method:'POST',
-    headers: { 'X-API-Key': 'baston123' }
-  });
+  try {
+    await fetch(BASE + '/api/limpiar', {
+      method:'POST',
+      headers: { 'X-API-Key': 'baston123' }
+    });
 
-  document.getElementById('historico').innerHTML = '';
-  alert('✅ Histórico limpiado correctamente');
+    document.getElementById('historico').innerHTML = '<p style="text-align:center; color:#999; padding:20px;">No hay datos en el histórico</p>';
+    alert('✅ Histórico limpiado correctamente');
+  } catch(e) {
+    alert('❌ Error al limpiar: ' + e.message);
+  }
 }
 
 function limpiarAlertas() {
-  if (!confirm("¿Limpiar registro de alertas?")) return;
+  if (!confirm("¿Limpiar el registro de alertas de hoy?")) return;
   
   alertasHoy = [];
   contadorAlertas = 0;
@@ -598,33 +673,47 @@ async function descargarHistorico() {
     const r = await fetch(BASE + '/api/historico');
     const hist = await r.json();
     
+    if (hist.length === 0) {
+      alert('⚠️ No hay datos para descargar');
+      return;
+    }
+    
     const csv = 'Fecha,Hora,Distancia (cm),Alerta,Latitud,Longitud,Satelites\n' + 
       hist.map(h => {
         const fecha = new Date(h.tiempo);
         return `${fecha.toLocaleDateString()},${fecha.toLocaleTimeString()},${h.distancia},${h.alerta ? 'Sí' : 'No'},${h.latitud || ''},${h.longitud || ''},${h.satelites || ''}`;
       }).join('\n');
     
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `baston_historico_gps_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `baston_gps_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     
+    alert('✅ Archivo descargado correctamente');
+    
   } catch(e){ 
-    alert('Error al descargar: ' + e.message);
+    alert('❌ Error al descargar: ' + e.message);
   }
 }
 
-setInterval(()=>{ obtener(); cargarHistorico(); }, 2000);
-obtener(); cargarHistorico();
+// Actualizar datos cada 2 segundos
+setInterval(() => { 
+  obtener(); 
+  cargarHistorico(); 
+}, 2000);
+
+// Cargar datos iniciales
+obtener(); 
+cargarHistorico();
 
 window.addEventListener('load', () => {
-  console.log('🦯 Sistema de alertas del Bastón Inteligente con GPS activado');
+  console.log('🦯 Sistema de Bastón Inteligente con GPS inicializado');
+  console.log('📡 Esperando datos del sensor y GPS...');
 });
 </script>
 
 </body>
-</html>
 </html>
