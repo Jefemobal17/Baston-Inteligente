@@ -13,6 +13,7 @@ body{
   color:#4a4a4a;
   margin:0;
   padding:20px;
+  transition: background 0.3s ease;
 }
 
 .container{
@@ -77,6 +78,38 @@ img.ultima{
   border-radius:12px;
   border:3px solid #f9c6e4;
 }
+
+/* Animación de shake para alertas */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+/* Botón de notificaciones */
+.notif-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #8b5cf6;
+  color: white;
+  border: none;
+  padding: 15px 20px;
+  border-radius: 50px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  font-weight: bold;
+  z-index: 1000;
+}
+
+.notif-btn:hover {
+  background: #7c3aed;
+}
+
+/* Alerta parpadeante */
+.alerta-activa {
+  animation: shake 0.5s infinite;
+}
 </style>
 </head>
 
@@ -85,7 +118,7 @@ img.ultima{
   <h1>🦯 Bastón Inteligente - Monitor</h1>
 
   <!-- TARJETA DE DISTANCIA -->
-  <div class="card">
+  <div class="card" id="cardDistancia">
     <h2>Distancia actual</h2>
     <div class="distancia-valor" id="distancia">-- cm</div>
     <div id="estado">Esperando...</div>
@@ -114,23 +147,139 @@ img.ultima{
 const BASE = "";
 
 // --------------------------------------
-// NOTIFICACIONES
+// NOTIFICACIONES MEJORADAS
 // --------------------------------------
-if (Notification.permission !== "granted") {
-    Notification.requestPermission();
-}
+let alertaPrev = false;
+let ultimaNotificacion = 0;
+const INTERVALO_NOTIFICACION = 3000; // Notificar cada 3 segundos si persiste la alerta
 
-function enviarNotificacion(mensaje) {
-    if (Notification.permission === "granted") {
-        new Notification("🚨 Bastón Inteligente", {
-            body: mensaje,
-            icon: "https://cdn-icons-png.flaticon.com/128/3917/3917215.png"
-        });
+// Solicitar permisos al cargar
+async function solicitarPermisos() {
+    if (Notification.permission === "default") {
+        const permiso = await Notification.requestPermission();
+        if (permiso === "granted") {
+            console.log("✅ Notificaciones activadas");
+            mostrarMensaje("✅ Notificaciones activadas correctamente", "success");
+        } else {
+            console.log("❌ Notificaciones bloqueadas");
+            mostrarMensaje("⚠️ Por favor activa las notificaciones", "warning");
+        }
     }
 }
 
-// Evita repetir notificaciones
-let alertaPrev = false;
+// Llamar al inicio
+solicitarPermisos();
+
+function enviarNotificacion(mensaje, tipo = "alerta") {
+    const ahora = Date.now();
+    
+    // Evitar spam de notificaciones
+    if (tipo === "alerta" && ahora - ultimaNotificacion < INTERVALO_NOTIFICACION) {
+        return;
+    }
+    
+    if (Notification.permission === "granted") {
+        const notificacion = new Notification("🚨 Bastón Inteligente - ALERTA", {
+            body: mensaje,
+            icon: "https://cdn-icons-png.flaticon.com/128/3917/3917215.png",
+            badge: "https://cdn-icons-png.flaticon.com/128/3917/3917215.png",
+            tag: "baston-alerta", // Evita duplicados
+            requireInteraction: true, // Mantiene la notificación visible
+            vibrate: [200, 100, 200, 100, 200], // Vibración en móvil
+            silent: false
+        });
+        
+        // Reproducir sonido de alerta
+        reproducirSonido();
+        
+        // Click en notificación enfoca la ventana
+        notificacion.onclick = function() {
+            window.focus();
+            this.close();
+        };
+        
+        ultimaNotificacion = ahora;
+        console.log("📢 Notificación enviada:", mensaje);
+    } else {
+        console.warn("⚠️ Permiso de notificaciones no concedido");
+        // Mostrar alerta visual en la página
+        mostrarAlertaVisual(mensaje);
+    }
+}
+
+// Sonido de alerta
+function reproducirSonido() {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 800; // Frecuencia del beep
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+    } catch(e) {
+        console.log("No se pudo reproducir sonido:", e);
+    }
+}
+
+// Alerta visual alternativa si no hay permisos
+function mostrarAlertaVisual(mensaje) {
+    const alerta = document.createElement('div');
+    alerta.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #dc2626;
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 9999;
+        font-weight: bold;
+        animation: shake 0.5s;
+        max-width: 300px;
+    `;
+    alerta.textContent = "🚨 " + mensaje;
+    document.body.appendChild(alerta);
+    
+    setTimeout(() => alerta.remove(), 5000);
+}
+
+// Mensaje de sistema
+function mostrarMensaje(texto, tipo) {
+    const colores = {
+        success: '#16a34a',
+        warning: '#ea580c',
+        info: '#2563eb'
+    };
+    
+    const msg = document.createElement('div');
+    msg.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${colores[tipo] || colores.info};
+        color: white;
+        padding: 15px 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        z-index: 9999;
+        font-weight: 500;
+    `;
+    msg.textContent = texto;
+    document.body.appendChild(msg);
+    
+    setTimeout(() => msg.remove(), 3000);
+}
 
 // --------------------------------------
 // OBTENER DATOS DEL SERVIDOR
@@ -145,19 +294,42 @@ async function obtener() {
     document.getElementById('distancia').textContent =
       (data.distancia || 0).toFixed(1) + " cm";
 
+    const cardDistancia = document.getElementById('cardDistancia');
+
     // ALERTA
     if (data.alerta) {
-      document.getElementById('estado').textContent =
-        "⚠️ ALERTA - Objeto cercano";
+      document.getElementById('estado').innerHTML =
+        '<span style="color:#dc2626;font-weight:bold;font-size:18px;">🚨 ALERTA - Objeto cercano</span>';
 
-      if (!alertaPrev) {
-        enviarNotificacion("Alerta: Objeto muy cercano detectado.");
+      // Añadir animación shake a la tarjeta
+      cardDistancia.classList.add('alerta-activa');
+
+      // Notificar con detalle de distancia
+      if (!alertaPrev || Date.now() - ultimaNotificacion >= INTERVALO_NOTIFICACION) {
+        enviarNotificacion(
+          `⚠️ PELIGRO: Objeto a ${(data.distancia || 0).toFixed(1)} cm del bastón`,
+          "alerta"
+        );
         alertaPrev = true;
       }
 
+      // Cambiar color de fondo en alerta
+      document.body.style.background = '#fee2e2';
+
     } else {
-      document.getElementById('estado').textContent = "✅ Normal";
+      document.getElementById('estado').innerHTML = 
+        '<span style="color:#16a34a;">✅ Normal - Sin obstáculos</span>';
+      
+      // Quitar animación
+      cardDistancia.classList.remove('alerta-activa');
+      
+      // Si antes había alerta y ahora no, notificar que se despejó
+      if (alertaPrev) {
+        enviarNotificacion("✅ Vía despejada - Alerta terminada", "normal");
+      }
+      
       alertaPrev = false;
+      document.body.style.background = '#fce7f3';
     }
 
     // Imagen de ESP32-CAM
@@ -205,7 +377,7 @@ async function limpiarHistorico() {
   });
 
   document.getElementById('historico').innerHTML = '';
-  alert('Histórico limpiado');
+  mostrarMensaje('Histórico limpiado correctamente', 'success');
 }
 
 // --------------------------------------
@@ -213,6 +385,23 @@ async function limpiarHistorico() {
 // --------------------------------------
 setInterval(()=>{ obtener(); cargarHistorico(); }, 2000);
 obtener(); cargarHistorico();
+
+// Botón flotante para activar notificaciones manualmente
+const btnNotif = document.createElement('button');
+btnNotif.className = 'notif-btn';
+btnNotif.innerHTML = '🔔 Activar Notificaciones';
+btnNotif.onclick = async () => {
+  await solicitarPermisos();
+  if (Notification.permission === "granted") {
+    btnNotif.innerHTML = '✅ Notificaciones ON';
+    setTimeout(() => btnNotif.style.display = 'none', 2000);
+  }
+};
+
+// Mostrar botón solo si no están activadas
+if (Notification.permission !== "granted") {
+  document.body.appendChild(btnNotif);
+}
 </script>
 
 </body>
