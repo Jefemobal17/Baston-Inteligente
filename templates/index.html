@@ -3,10 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Bastón Inteligente</title>
+<title>Bastón Inteligente con GPS</title>
 
 <style>
-/* ----------- ESTILO PASTEL PARA NIÑAS ----------- */
 body{
   font-family:'Poppins', sans-serif;
   background:#fce7f3;
@@ -111,6 +110,74 @@ button.secondary:hover{
   50% { opacity: 0.6; }
 }
 
+.gps-info{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:15px;
+  margin-top:15px;
+}
+
+.gps-dato{
+  background:#f3f4f6;
+  padding:15px;
+  border-radius:10px;
+  border-left:4px solid #d946ef;
+}
+
+.gps-label{
+  font-size:13px;
+  color:#666;
+  font-weight:500;
+  margin-bottom:5px;
+}
+
+.gps-valor{
+  font-size:20px;
+  color:#1f2937;
+  font-weight:600;
+  font-family:monospace;
+}
+
+.gps-mapa{
+  text-align:center;
+  margin-top:15px;
+}
+
+.gps-mapa a{
+  display:inline-block;
+  background:#10b981;
+  color:white;
+  padding:12px 24px;
+  border-radius:10px;
+  text-decoration:none;
+  font-weight:500;
+  transition:0.2s;
+}
+
+.gps-mapa a:hover{
+  background:#059669;
+  transform:scale(1.05);
+}
+
+.gps-estado{
+  display:inline-block;
+  padding:6px 12px;
+  border-radius:6px;
+  font-size:14px;
+  font-weight:500;
+  margin-top:10px;
+}
+
+.gps-estado.valido{
+  background:#d1fae5;
+  color:#065f46;
+}
+
+.gps-estado.invalido{
+  background:#fee2e2;
+  color:#991b1b;
+}
+
 .historico{
   max-height:300px;
   overflow:auto;
@@ -125,12 +192,6 @@ button.secondary:hover{
   background:#fee2e2;
   font-weight:500;
   color:#991b1b;
-}
-
-img.ultima{
-  max-width:100%;
-  border-radius:12px;
-  border:3px solid #f9c6e4;
 }
 
 .alertas-registro{
@@ -188,7 +249,7 @@ img.ultima{
 
 <body>
 <div class="container">
-  <h1>🦯 Bastón Inteligente - Monitor</h1>
+  <h1>🦯 Bastón Inteligente - Monitor GPS</h1>
 
   <!-- TARJETA DE DISTANCIA -->
   <div class="card" id="cardDistancia">
@@ -203,6 +264,37 @@ img.ultima{
       <label>
         <input type="checkbox" id="vozCheck" checked> Activar alerta de voz
       </label>
+    </div>
+  </div>
+
+  <!-- TARJETA GPS -->
+  <div class="card">
+    <h2>📍 Ubicación GPS</h2>
+    <div id="gpsEstado" class="gps-estado invalido">⏳ Esperando señal GPS...</div>
+    
+    <div class="gps-info">
+      <div class="gps-dato">
+        <div class="gps-label">🌍 Latitud</div>
+        <div class="gps-valor" id="latitud">--</div>
+      </div>
+      <div class="gps-dato">
+        <div class="gps-label">🌍 Longitud</div>
+        <div class="gps-valor" id="longitud">--</div>
+      </div>
+      <div class="gps-dato">
+        <div class="gps-label">🛰️ Satélites</div>
+        <div class="gps-valor" id="satelites">0</div>
+      </div>
+      <div class="gps-dato">
+        <div class="gps-label">⏰ Última actualización</div>
+        <div class="gps-valor" id="ultimaActualizacion" style="font-size:16px;">--</div>
+      </div>
+    </div>
+    
+    <div class="gps-mapa">
+      <a href="#" id="verMapa" target="_blank" style="display:none;">
+        🗺️ Ver en Google Maps
+      </a>
     </div>
   </div>
 
@@ -234,14 +326,6 @@ img.ultima{
     <button onclick="limpiarAlertas()">Limpiar registro de alertas</button>
   </div>
 
-  <!-- TARJETA DE IMAGEN -->
-  <div class="card">
-    <h2>📸 Última imagen (ESP32-CAM)</h2>
-    <div id="imagenCont">
-      <p>No hay imagen aún</p>
-    </div>
-  </div>
-
   <!-- HISTÓRICO -->
   <div class="card">
     <h2>📝 Histórico completo</h2>
@@ -251,18 +335,13 @@ img.ultima{
   </div>
 </div>
 
-<!-- Audio para alertas -->
 <audio id="audioAlerta" preload="auto">
   <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLaizsIGGS77OmdTQ0PP6Hk77RiHAU7k9nyzn0vBSF1xe/glEILElyx6OyrWBQLRJre8cJwIQUug9DY3Jk" type="audio/wav">
 </audio>
 
 <script>
-// --------------------------------------
-// CONFIG
-// --------------------------------------
 const BASE = "";
 
-// Variables de estado
 let alertaPrev = false;
 let contadorAlertas = 0;
 let distanciaMinima = Infinity;
@@ -271,16 +350,16 @@ let ultimaDistanciaAlerta = null;
 let audioContext = null;
 let synth = null;
 
-// --------------------------------------
-// INICIALIZACIÓN DE VOZ
-// --------------------------------------
+// GPS
+let gpsLatitud = null;
+let gpsLongitud = null;
+let gpsSatelites = 0;
+let gpsValido = false;
+
 if ('speechSynthesis' in window) {
   synth = window.speechSynthesis;
 }
 
-// --------------------------------------
-// NOTIFICACIONES
-// --------------------------------------
 if (Notification.permission !== "granted") {
   Notification.requestPermission();
 }
@@ -296,9 +375,6 @@ function enviarNotificacion(mensaje, distancia) {
   }
 }
 
-// --------------------------------------
-// ALERTA SONORA
-// --------------------------------------
 function reproducirAlertaSonora() {
   const sonidoActivo = document.getElementById('sonidoCheck').checked;
   if (!sonidoActivo) return;
@@ -307,7 +383,6 @@ function reproducirAlertaSonora() {
   audio.currentTime = 0;
   audio.play().catch(e => console.log('Error audio:', e));
   
-  // Sonido adicional con Web Audio API
   if (!audioContext) {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
   }
@@ -328,14 +403,11 @@ function reproducirAlertaSonora() {
   oscillator.stop(audioContext.currentTime + 0.5);
 }
 
-// --------------------------------------
-// ALERTA DE VOZ
-// --------------------------------------
 function hablarAlerta(distancia) {
   const vozActiva = document.getElementById('vozCheck').checked;
   if (!vozActiva || !synth) return;
 
-  synth.cancel(); // Cancelar cualquier mensaje anterior
+  synth.cancel();
   
   let mensaje = '';
   if (distancia < 20) {
@@ -355,9 +427,6 @@ function hablarAlerta(distancia) {
   synth.speak(utterance);
 }
 
-// --------------------------------------
-// REGISTRAR ALERTA
-// --------------------------------------
 function registrarAlerta(distancia) {
   const ahora = new Date();
   contadorAlertas++;
@@ -365,6 +434,8 @@ function registrarAlerta(distancia) {
   const alerta = {
     tiempo: ahora.toISOString(),
     distancia: distancia,
+    latitud: gpsLatitud,
+    longitud: gpsLongitud,
     id: Date.now()
   };
   
@@ -375,9 +446,6 @@ function registrarAlerta(distancia) {
   actualizarEstadisticas(ahora, distancia);
 }
 
-// --------------------------------------
-// ACTUALIZAR REGISTRO DE ALERTAS
-// --------------------------------------
 function actualizarRegistroAlertas() {
   const contenedor = document.getElementById('alertasRegistro');
   
@@ -386,18 +454,20 @@ function actualizarRegistroAlertas() {
     return;
   }
   
-  contenedor.innerHTML = alertasHoy.map(a => `
+  contenedor.innerHTML = alertasHoy.map(a => {
+    let ubicacion = '';
+    if (a.latitud && a.longitud) {
+      ubicacion = `<br>📍 Ubicación: ${a.latitud.toFixed(6)}, ${a.longitud.toFixed(6)}`;
+    }
+    return `
     <div class="alerta-item">
       <strong>⚠️ ALERTA</strong><br>
       ${new Date(a.tiempo).toLocaleString()}<br>
-      Distancia: <strong>${a.distancia.toFixed(1)} cm</strong>
+      Distancia: <strong>${a.distancia.toFixed(1)} cm</strong>${ubicacion}
     </div>
-  `).join('');
+  `}).join('');
 }
 
-// --------------------------------------
-// ACTUALIZAR ESTADÍSTICAS
-// --------------------------------------
 function actualizarEstadisticas(tiempo, distancia) {
   document.getElementById('totalAlertas').textContent = contadorAlertas;
   document.getElementById('ultimaAlerta').textContent = tiempo.toLocaleTimeString();
@@ -408,9 +478,26 @@ function actualizarEstadisticas(tiempo, distancia) {
   }
 }
 
-// --------------------------------------
-// OBTENER DATOS DEL SERVIDOR
-// --------------------------------------
+function actualizarGPS(lat, lng, sats) {
+  gpsLatitud = lat;
+  gpsLongitud = lng;
+  gpsSatelites = sats;
+  gpsValido = true;
+  
+  document.getElementById('latitud').textContent = lat.toFixed(6);
+  document.getElementById('longitud').textContent = lng.toFixed(6);
+  document.getElementById('satelites').textContent = sats;
+  document.getElementById('ultimaActualizacion').textContent = new Date().toLocaleTimeString();
+  
+  const estadoGPS = document.getElementById('gpsEstado');
+  estadoGPS.className = 'gps-estado valido';
+  estadoGPS.textContent = '✅ GPS Activo';
+  
+  const enlaceMapa = document.getElementById('verMapa');
+  enlaceMapa.style.display = 'inline-block';
+  enlaceMapa.href = `https://www.google.com/maps?q=${lat},${lng}`;
+}
+
 async function obtener() {
   try {
     const r = await fetch(BASE + '/api/datos');
@@ -422,17 +509,19 @@ async function obtener() {
     const estadoEl = document.getElementById('estado');
     const cardEl = document.getElementById('cardDistancia');
 
-    // Mostrar distancia
     distanciaEl.textContent = distancia.toFixed(1) + " cm";
 
-    // ALERTA
+    // Actualizar GPS si está disponible
+    if (data.latitud && data.longitud) {
+      actualizarGPS(data.latitud, data.longitud, data.satelites || 0);
+    }
+
     if (data.alerta) {
       distanciaEl.classList.add('peligro');
       estadoEl.className = 'estado alerta';
       estadoEl.textContent = "⚠️ ¡ALERTA! - Objeto cercano detectado";
       cardEl.classList.add('alerta');
 
-      // Solo activar alertas si es una nueva alerta o cambió significativamente la distancia
       if (!alertaPrev || (ultimaDistanciaAlerta && Math.abs(ultimaDistanciaAlerta - distancia) > 10)) {
         reproducirAlertaSonora();
         hablarAlerta(distancia);
@@ -452,23 +541,11 @@ async function obtener() {
       ultimaDistanciaAlerta = null;
     }
 
-    // Imagen de ESP32-CAM
-    const imgRes = await fetch(BASE + '/api/last_image');
-    if (imgRes.status === 200) {
-      const info = await imgRes.json();
-      document.getElementById('imagenCont').innerHTML =
-      `<img class="ultima" src="${BASE}/uploads/${info.filename}" alt="Imagen">
-       <div>📅 Subido: ${new Date(info.timestamp).toLocaleString()}</div>`;
-    }
-
   } catch (e) {
     console.log(e);
   }
 }
 
-// --------------------------------------
-// HISTÓRICO
-// --------------------------------------
 async function cargarHistorico() {
   try {
     const r = await fetch(BASE + '/api/historico');
@@ -477,17 +554,18 @@ async function cargarHistorico() {
     document.getElementById('historico').innerHTML =
       hist.map(h => {
         const clase = h.alerta ? ' class="peligro"' : '';
+        let gpsInfo = '';
+        if (h.latitud && h.longitud) {
+          gpsInfo = ` | 📍 ${h.latitud.toFixed(4)}, ${h.longitud.toFixed(4)}`;
+        }
         return `<div${clase}>${new Date(h.tiempo).toLocaleString()} — ${h.distancia} cm ${
            h.alerta ? '⚠️ ALERTA' : '✅'
-        }</div>`;
+        }${gpsInfo}</div>`;
       }).join('');
 
   } catch(e){ console.log(e); }
 }
 
-// --------------------------------------
-// LIMPIAR HISTÓRICO
-// --------------------------------------
 async function limpiarHistorico() {
   if (!confirm("¿Limpiar histórico completo?")) return;
 
@@ -500,9 +578,6 @@ async function limpiarHistorico() {
   alert('✅ Histórico limpiado correctamente');
 }
 
-// --------------------------------------
-// LIMPIAR ALERTAS
-// --------------------------------------
 function limpiarAlertas() {
   if (!confirm("¿Limpiar registro de alertas?")) return;
   
@@ -518,25 +593,22 @@ function limpiarAlertas() {
   alert('✅ Registro de alertas limpiado');
 }
 
-// --------------------------------------
-// DESCARGAR HISTÓRICO
-// --------------------------------------
 async function descargarHistorico() {
   try {
     const r = await fetch(BASE + '/api/historico');
     const hist = await r.json();
     
-    const csv = 'Fecha,Hora,Distancia (cm),Alerta\n' + 
+    const csv = 'Fecha,Hora,Distancia (cm),Alerta,Latitud,Longitud,Satelites\n' + 
       hist.map(h => {
         const fecha = new Date(h.tiempo);
-        return `${fecha.toLocaleDateString()},${fecha.toLocaleTimeString()},${h.distancia},${h.alerta ? 'Sí' : 'No'}`;
+        return `${fecha.toLocaleDateString()},${fecha.toLocaleTimeString()},${h.distancia},${h.alerta ? 'Sí' : 'No'},${h.latitud || ''},${h.longitud || ''},${h.satelites || ''}`;
       }).join('\n');
     
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `baston_historico_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `baston_historico_gps_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     
@@ -545,17 +617,14 @@ async function descargarHistorico() {
   }
 }
 
-// --------------------------------------
-// ACTUALIZACIÓN AUTOMÁTICA
-// --------------------------------------
 setInterval(()=>{ obtener(); cargarHistorico(); }, 2000);
 obtener(); cargarHistorico();
 
-// Cargar alertas guardadas (si existen)
 window.addEventListener('load', () => {
-  console.log('🦯 Sistema de alertas del Bastón Inteligente activado');
+  console.log('🦯 Sistema de alertas del Bastón Inteligente con GPS activado');
 });
 </script>
 
 </body>
+</html>
 </html>
